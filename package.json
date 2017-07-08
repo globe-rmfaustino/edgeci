@@ -1,0 +1,19 @@
+{
+  "name": "edgeci",
+  "version": "0.0.1",
+  "description": "Apigee Edge command line utility to export/import API proxies for continuous integration",
+  "main": "edgeci.js",
+  "author": "srinivas.sudhindra@gmail.com",
+  "license" : "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gahana/edgeci.git"
+  },
+  "dependencies": {
+    "request": "^2.81.0",
+    "unzip": "^0.1.11",
+    "argparse": "^1.0.9",
+    "rimraf": "^2.6.1",
+    "zip-folder": "^1.0.0"
+  }
+}
