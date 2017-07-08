@@ -84,7 +84,9 @@ Optional arguments:
 
 ```
 $ edgeci test --help
-usage: edgeci test [-h] -o ORG -p [PROXY [PROXY ...]] -r RUN [-i INTERVAL]
+usage: edgeci test [-h] -o ORG -p [PROXY [PROXY ...]] [-w [WATCH [WATCH ...]]]
+                   -r RUN [-i INTERVAL]
+
 
 Optional arguments:
   -h, --help            Show this help message and exit.
@@ -92,6 +94,8 @@ Optional arguments:
   -p [PROXY [PROXY ...]], --proxy [PROXY [PROXY ...]]
                         proxies to check for updates, space separated names
                         or "all"
+  -w [WATCH [WATCH ...]], --watch [WATCH [WATCH ...]]
+                        optional, test directory to watch for changes
   -r RUN, --run RUN     command to run tests
   -i INTERVAL, --interval INTERVAL
                         interval to check for updates in seconds
