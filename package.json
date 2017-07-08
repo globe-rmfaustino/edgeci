@@ -1,6 +1,6 @@
 {
   "name": "edgeci",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Apigee Edge command line utility to export/import API proxies for continuous integration",
   "author": "srinivas.sudhindra@gmail.com",
   "license" : "MIT",

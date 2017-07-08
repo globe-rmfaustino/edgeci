@@ -5,6 +5,7 @@ var unzip = require('unzip');
 var rimraf = require('rimraf');
 var zipfolder = require('zip-folder');
 var request = require("request");
+var exec = require('child_process').exec;
 var ArgumentParser = require("argparse").ArgumentParser;
 
 var baseURL = 'https://api.enterprise.apigee.com/v1/organizations/';
@@ -13,7 +14,7 @@ var args = {};
 
 function parseArgs() {
   var parser = new ArgumentParser({
-    version: '0.0.3',
+    version: '0.0.4',
     addHelp: true,
     description: 'edgeci command line tool'
   });
@@ -26,10 +27,12 @@ function parseArgs() {
     { action: 'storeTrue', help: 'verbose logging to console' }
   );
   var subparsers = parser.addSubparsers({ title: 'command', dest: "command" });
-  var pullCommand = subparsers.addParser('pull', { addHelp: true, help: "pull help" });
+  var pullCommand = subparsers.addParser('pull', { addHelp: true, help: "pull proxy from an org" });
   addPullArgs(pullCommand);
-  var pushCommand = subparsers.addParser('push', { addHelp: true, help: "push help" });
+  var pushCommand = subparsers.addParser('push', { addHelp: true, help: "push proxy to an org" });
   addPushArgs(pushCommand);
+  var testCommand = subparsers.addParser('test', { addHelp: true, help: "run tests when a proxy is changed/deployed" });
+  addTestArgs(testCommand);
   args = parser.parseArgs();
   args.username = process.env.EDGE_USERNAME;
   args.password = process.env.EDGE_PASSWORD;
@@ -42,7 +45,7 @@ function addPullArgs(pullCommand) {
   );
   pullCommand.addArgument(
     [ '-p', '--proxy' ],
-    { action: 'store', required: true, nargs: '*', help: 'proxies to pull, space separated names' }
+    { action: 'store', required: true, nargs: '*', help: 'proxies to pull, space separated names or "all"' }
   );
   pullCommand.addArgument(
     [ '-d', '--destination' ],
@@ -65,7 +68,7 @@ function addPushArgs(pullCommand) {
   );
   pullCommand.addArgument(
     [ '-p', '--proxy' ],
-    { action: 'store', required: true, nargs: '*', help: 'proxies to push, space separated names' }
+    { action: 'store', required: true, nargs: '*', help: 'proxies to push, space separated names or "all"' }
   );
   pullCommand.addArgument(
     [ '-s', '--source' ],
@@ -78,6 +81,25 @@ function addPushArgs(pullCommand) {
   pullCommand.addArgument(
     [ '-e', '--env' ],
     { action: 'store', help: 'deploy to env specified' }
+  );
+}
+
+function addTestArgs(testCommand) {
+  testCommand.addArgument(
+    [ '-o', '--org' ],
+    { action: 'store', required: true, help: 'name of Edge org to check for updates' }
+  );
+  testCommand.addArgument(
+    [ '-p', '--proxy' ],
+    { action: 'store', required: true, nargs: '*', help: 'proxies to check for updates, space separated names or "all"' }
+  );
+  testCommand.addArgument(
+    [ '-r', '--run' ],
+    { action: 'store', required: true, help: 'command to run tests' }
+  );
+  testCommand.addArgument(
+    [ '-i', '--interval' ],
+    { action: 'store', type: 'int', defaultValue: 60, help: 'interval to check for updates in seconds' }
   );
 }
 
@@ -95,6 +117,8 @@ function runCommand() {
     }
   } else if (args.command === "push") {
     push();
+  } else if (args.command === "test") {
+    setInterval(test, (args.interval * 1000));
   } else {
     console.log("Unknown command " + args.command);
   }
@@ -139,10 +163,29 @@ function push() {
   pushProxies();
 }
 
+function testWithArgs(username, password, org, proxies, command, interval) {
+  args = {};
+  args.org = org;
+  args.proxy = proxies;
+  args.command = command;
+  args.interval = interval;
+  args.username = username;
+  args.password = password;
+  test();
+}
+
+function test() {
+  if (args.proxy[0] === "all") {
+    getProxyList(args.org, testProxies);
+  } else {
+    testProxies();
+  }
+}
+
 function pullProxies() {
   args.proxy.forEach(function(aProxy) {
     verboseLog("Checking proxy: " + aProxy);
-    getProxyToPull(args.org, aProxy);
+    getProxyToPull(args.org, aProxy, exportProxy);
   });
 }
 
@@ -151,6 +194,13 @@ function pushProxies() {
     verboseLog("Checking proxy: " + aProxy);
     zipProxy(aProxy);
     getProxyToPush(args.org, aProxy);
+  });
+}
+
+function testProxies() {
+  args.proxy.forEach(function(aProxy) {
+    verboseLog("Checking proxy: " + aProxy);
+    getProxyToPull(args.org, aProxy, runTestCommand);
   });
 }
 
@@ -166,7 +216,7 @@ function getProxySourceDirs() {
   );
 }
 
-function getProxyToPull(orgName, proxyName) {
+function getProxyToPull(orgName, proxyName, callback) {
 	request(apiOptions(orgName, proxyName), function(error, response, body) {
 	  if (!error && response.statusCode == 200) {
       var content = JSON.parse(body);
@@ -178,8 +228,7 @@ function getProxyToPull(orgName, proxyName) {
           lastRevision: lastRevision,
           lastModified: lastModified
         }
-        defaultLog("Exporting proxy " + proxyName + " revision " + lastRevision);
-        exportProxy(orgName, proxyName, lastRevision);
+        callback(orgName, proxyName, lastRevision);
       }
 	  } else {
 	  	logError('getAPI: ', error, response, body);
@@ -193,15 +242,11 @@ function getProxyToPush(orgName, proxyName) {
       var content = JSON.parse(body);
       var lastRevision = getMaxRevision(content.revision);
       if (args.update) {
-        defaultLog("Updating proxy " + proxyName + " revision " + lastRevision);
         updateProxy(orgName, proxyName, lastRevision);
       } else {
-        newRevision = lastRevision + 1;
-        defaultLog("Importing proxy " + proxyName + " new revision " + newRevision);
-        importProxy(orgName, proxyName, newRevision);
+        importProxy(orgName, proxyName, lastRevision + 1);
       }
     } else {
-      defaultLog("Importing new proxy " + proxyName);
       importProxy(orgName, proxyName, 1);
     }
   });
@@ -222,6 +267,7 @@ function getProxyList(orgName, callback) {
 }
 
 function exportProxy(orgName, proxyName, revision) {
+  defaultLog("Exporting proxy " + proxyName + " revision " + revision);
   rimraf.sync(getProxyDestinationPath(proxyName));
   request(exportOptions(orgName, proxyName, revision), function(error, response, body) {
     if (!error && response.statusCode == 200) {
@@ -245,6 +291,7 @@ function zipProxy(proxyName) {
 }
 
 function importProxy(orgName, proxyName, revision) {
+  defaultLog("Importing proxy " + proxyName + " revision " + revision);
   request(importOptions(orgName, proxyName), function(error, response, body) {
     if (!error && response.statusCode == 201) {
       defaultLog("Done importing proxy " + proxyName);
@@ -256,6 +303,7 @@ function importProxy(orgName, proxyName, revision) {
 }
 
 function updateProxy(orgName, proxyName, revision) {
+  defaultLog("Updating proxy " + proxyName + " revision " + revision);
   request(updateOptions(orgName, proxyName, revision), function(error, response, body) {
     if (!error && response.statusCode == 200) {
       defaultLog("Done updating proxy " + proxyName + " revision " + revision);
@@ -273,6 +321,16 @@ function deployProxy(orgName, proxyName, revision) {
       defaultLog("Done deploying proxy " + proxyName + " revision " + revision + " to env " + args.env);
     } else {
       logError('deployProxy: ', error, response, body);
+    }
+  });
+}
+
+function runTestCommand() {
+  exec(args.run, function(error, stdout, stderr) {
+    defaultLog(stdout);
+    if (error !== null) {
+      console.log(error);
+      console.log(stderr);
     }
   });
 }
