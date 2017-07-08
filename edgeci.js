@@ -3,6 +3,7 @@
 var fs = require('fs');
 var unzip = require('unzip');
 var rimraf = require('rimraf');
+var chokidar = require('chokidar');
 var zipfolder = require('zip-folder');
 var request = require("request");
 var exec = require('child_process').exec;
@@ -94,6 +95,10 @@ function addTestArgs(testCommand) {
     { action: 'store', required: true, nargs: '*', help: 'proxies to check for updates, space separated names or "all"' }
   );
   testCommand.addArgument(
+    [ '-w', '--watch' ],
+    { action: 'store', required: false, nargs: '*', help: 'optional, test directory to watch for changes' }
+  );
+  testCommand.addArgument(
     [ '-r', '--run' ],
     { action: 'store', required: true, help: 'command to run tests' }
   );
@@ -118,6 +123,7 @@ function runCommand() {
   } else if (args.command === "push") {
     push();
   } else if (args.command === "test") {
+    testDirWatch();
     setInterval(test, (args.interval * 1000));
   } else {
     console.log("Unknown command " + args.command);
@@ -179,6 +185,18 @@ function test() {
     getProxyList(args.org, testProxies);
   } else {
     testProxies();
+  }
+}
+
+function testDirWatch() {
+  // watch test directory for changes
+  if (args.watch) {
+    chokidar.watch(args.watch, {
+      ignored: /(^|[\/\\])\../,   // ignores .dotfiles
+      persistent: true
+    }).on('change', (event, path) => {
+      runTestCommand();
+    });
   }
 }
 

@@ -3,7 +3,7 @@
   "version": "0.0.4",
   "description": "Apigee Edge command line utility to export/import API proxies for continuous integration",
   "author": "srinivas.sudhindra@gmail.com",
-  "license" : "MIT",
+  "license": "MIT",
   "preferGlobal": true,
   "repository": {
     "type": "git",
@@ -14,10 +14,11 @@
     "edgeci": "edgeci.js"
   },
   "dependencies": {
-    "request": "^2.81.0",
-    "unzip": "^0.1.11",
     "argparse": "^1.0.9",
+    "chokidar": "^1.7.0",
+    "request": "^2.81.0",
     "rimraf": "^2.6.1",
+    "unzip": "^0.1.11",
     "zip-folder": "^1.0.0"
   }
 }

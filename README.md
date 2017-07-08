@@ -173,6 +173,14 @@ $ cd tests/bdd
 $ edgeci test --org org1 --proxy proxy1 --run "grunt tests" --interval 30
 ```
 
+In addition to proxy also watch the current directory for changes and execute `grunt tests`.
+
+```
+$ cd tests/bdd
+$ edgeci test --org org1 --proxy proxy1 --watch . --run "grunt tests" --interval 30
+```
+
+
 # Use as module
 `edgeci` can also be used as a module within your nodeJS scripts.
 
