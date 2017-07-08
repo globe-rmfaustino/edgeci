@@ -161,11 +161,11 @@ edgeci.push("username@email.com", "password", "org", ["proxy1", "proxy2"], "sour
 ## Items to Pull(Export) / Push(Import)
 - [ ] Develop
 	- [ ] Specs
-	- [√] API Proxy
+	- [x] API Proxy
 	- [ ] Shared Flow
 - [ ] Publish
-	- [x] Developers (data not config)
-	- [x] Apps (data not config)
+	- [ ] Developers (data not config)
+	- [ ] Apps (data not config)
 	- [ ] API Products
 - [ ] Analyze
 	- [ ] Reports
@@ -176,10 +176,10 @@ edgeci.push("username@email.com", "password", "org", ["proxy1", "proxy2"], "sour
 		- [ ] Caches
 		- [ ] Flow Hooks
 		- [ ] Key Value Maps
-		- [?] References
-		- [?] Target Servers
-		- [?] TLS Keystores
-		- [?] Virtual Hosts
+		- [ ] References
+		- [ ] Target Servers
+		- [ ] TLS Keystores
+		- [ ] Virtual Hosts
 - [ ] Miscellaneous
 	- [ ] Monetization
 	- [ ] Microgateway
