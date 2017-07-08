@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 var fs = require('fs');
 var unzip = require('unzip');
 var rimraf = require('rimraf');
@@ -11,7 +13,7 @@ var args = {};
 
 function parseArgs() {
   var parser = new ArgumentParser({
-    version: '0.0.1',
+    version: '0.0.3',
     addHelp: true,
     description: 'edgeci command line tool'
   });
@@ -127,7 +129,7 @@ function pushWithArgs(username, password, org, proxies, source, update, env) {
   args.env = env;
   args.username = username;
   args.password = password;
-  pull();
+  push();
 }
 
 function push() {

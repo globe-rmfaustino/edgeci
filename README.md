@@ -159,30 +159,30 @@ edgeci.push("username@email.com", "password", "org", ["proxy1", "proxy2"], "sour
 # TODOs
 
 ## Items to Pull(Export) / Push(Import)
-[ ] Develop
-	[ ] Specs
-	[√] API Proxy
-	[ ] Shared Flow
-[ ] Publish
-	[x] Developers (data not config)
-	[x] Apps (data not config)
-	[ ] API Products
-[ ] Analyze
-	[ ] Reports
-[ ] Admin
-	[ ] Users
-	[ ] Roles
-	[ ] Environments
-		[ ] Caches
-		[ ] Flow Hooks
-		[ ] Key Value Maps
-		[?] References
-		[?] Target Servers
-		[?] TLS Keystores
-		[?] Virtual Hosts
-[ ] Miscellaneous
-	[ ] Monetization
-	[ ] Microgateway
+- [ ] Develop
+	- [ ] Specs
+	- [√] API Proxy
+	- [ ] Shared Flow
+- [ ] Publish
+	- [x] Developers (data not config)
+	- [x] Apps (data not config)
+	- [ ] API Products
+- [ ] Analyze
+	- [ ] Reports
+- [ ] Admin
+	- [ ] Users
+	- [ ] Roles
+	- [ ] Environments
+		- [ ] Caches
+		- [ ] Flow Hooks
+		- [ ] Key Value Maps
+		- [?] References
+		- [?] Target Servers
+		- [?] TLS Keystores
+		- [?] Virtual Hosts
+- [ ] Miscellaneous
+	- [ ] Monetization
+	- [ ] Microgateway
 
 ## Folders struture
 - apis
