@@ -34,10 +34,68 @@ function parseArgs() {
   addPushArgs(pushCommand);
   var testCommand = subparsers.addParser('test', { addHelp: true, help: "run tests when a proxy is changed/deployed" });
   addTestArgs(testCommand);
+  var getKvmCommand = subparsers.addParser('getKvm', { addHelp: true, help: "get kvm from environment" });
+  addGetKvmArgs(getKvmCommand);
+  var insertKvmEntryCommand = subparsers.addParser('insertKvm', { addHelp: true, help: "insert kvm entry in a map in a environment" });
+  addInsertKvmEntryArgs(insertKvmEntryCommand);
   args = parser.parseArgs();
   args.username = process.env.EDGE_USERNAME;
   args.password = process.env.EDGE_PASSWORD;
 }
+
+function addInsertKvmEntryArgs(insertKvmEntryCommand) {
+  insertKvmEntryCommand.addArgument(
+    [ '-o', '--org' ],
+    { action: 'store', required: true, help: 'name of Edge org to create kvm from' }
+  );
+
+  insertKvmEntryCommand.addArgument(
+    [ '-e', '--env' ],
+    { action: 'store', required: true, help: 'name of Edge env to create kvm from' }
+  );
+
+  insertKvmEntryCommand.addArgument(
+    [ '-m', '--map' ],
+    { action: 'store', required: true, help: 'map name of kvm to create' }
+  );
+
+  insertKvmEntryCommand.addArgument(
+    [ '-k', '--key' ],
+    { action: 'store', required: true, help: 'entry/key name of kvm to create' }
+  );
+
+  insertKvmEntryCommand.addArgument(
+    [ '-v', '--value' ],
+    { action: 'store', type: 'string', required: true, help: 'value of kvm to create' }
+  );
+
+}
+
+
+function addGetKvmArgs(getKvmCommand) {
+  getKvmCommand.addArgument(
+    [ '-o', '--org' ],
+    { action: 'store', required: true, help: 'name of Edge org to get kvm from' }
+  );
+
+  getKvmCommand.addArgument(
+    [ '-e', '--env' ],
+    { action: 'store', required: true, help: 'name of Edge env to get kvm from' }
+  );
+
+  getKvmCommand.addArgument(
+    [ '-m', '--map' ],
+    { action: 'store', required: true, help: 'map name of kvm to get' }
+  );
+
+  getKvmCommand.addArgument(
+    [ '-k', '--key' ],
+    { action: 'store', required: true, help: 'entry/key name of kvm to get' }
+  );
+
+}
+
+
 
 function addPullArgs(pullCommand) {
   pullCommand.addArgument(
@@ -125,9 +183,24 @@ function runCommand() {
   } else if (args.command === "test") {
     testDirWatch();
     setInterval(test, (args.interval * 1000));
+  } else if (args.command === "getKvm") {
+    getKvm();
+  } else if (args.command === "insertKvm") {
+    insertKvm();
   } else {
     console.log("Unknown command " + args.command);
   }
+}
+
+function getKvm() {
+
+  getKvmToPull(args.org, args.env, args.map, args.key);
+  
+}
+
+function insertKvm() {
+    defaultLog("insertKvm: " + args.value);
+    insertKvmEntry(args.org, args.env, args.map, args.key, args.value);
 }
 
 function pullWithArgs(username, password, org, proxies, destination, continuous, interval) {
@@ -234,9 +307,34 @@ function getProxySourceDirs() {
   );
 }
 
+function getKvmToPull(orgName, environment, mapName, entryName) {
+  request(getKvmOptions(orgName, environment, mapName, entryName), function(error, response, body) {
+    if (!error && response.statusCode == 200) {
+      var content = JSON.parse(body);
+      console.log(JSON.stringify(content));
+    } else {
+      logError('getKvmToPull: ', error, response, body);
+    }
+  });
+}
+
+function insertKvmEntry(orgName, environment, mapName, key, value) {
+  defaultLog("Inserting key " + key + " value " + value + " to map " + mapName);
+  request(insertKvmEntryOptions(orgName, environment, mapName, key, value), function(error, response, body) {
+    if (!error && response.statusCode == 201) {
+      var content = JSON.parse(body);
+      console.log(response.statusCode + " " +JSON.stringify(content));
+    } else {
+      logError('insertKvmEntry: ', error, JSON.stringify(response), body);      
+    }
+  });
+}
+
+
+
 function getProxyToPull(orgName, proxyName, callback) {
-	request(apiOptions(orgName, proxyName), function(error, response, body) {
-	  if (!error && response.statusCode == 200) {
+  request(apiOptions(orgName, proxyName), function(error, response, body) {
+    if (!error && response.statusCode == 200) {
       var content = JSON.parse(body);
       var lastRevision = getMaxRevision(content.revision);
       var lastModified = content.metaData.lastModifiedAt;
@@ -248,10 +346,10 @@ function getProxyToPull(orgName, proxyName, callback) {
         }
         callback(orgName, proxyName, lastRevision);
       }
-	  } else {
-	  	logError('getAPI: ', error, response, body);
-	  }
-	});
+    } else {
+      logError('getAPI: ', error, response, body);
+    }
+  });
 }
 
 function getProxyToPush(orgName, proxyName) {
@@ -282,6 +380,10 @@ function getProxyList(orgName, callback) {
       logError('listProxies: ', error, response, body);
     }
   });
+}
+
+function exportKvm() {
+  
 }
 
 function exportProxy(orgName, proxyName, revision) {
@@ -351,6 +453,35 @@ function runTestCommand() {
       console.log(stderr);
     }
   });
+}
+
+function getKvmOptions(orgName, environment, mapName, entryName) {
+  return {
+    url: baseURL +  orgName + "/environments/" + environment + "/keyvaluemaps/" + mapName + "/entries/" + entryName,
+    method: 'GET',
+    auth: {
+      user: args.username,
+      pass: args.password
+    }
+  };
+}
+
+function insertKvmEntryOptions(orgName, environment, mapName, kvmKey, kvmValue) {
+  
+  console.log("insertKvmEntryOptions kvmValue: " + kvmValue);
+  var postData = {name: kvmKey, value: kvmValue};
+  return {
+    url: baseURL +  orgName + "/environments/" + environment + "/keyvaluemaps/" + mapName + "/entries/",
+    method: 'POST',
+    body: JSON.stringify(postData),
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    auth: {
+      user: args.username,
+      pass: args.password
+    }
+  };
 }
 
 function listOptions(orgName) {
@@ -455,7 +586,7 @@ function getProxyZipPath(proxyName) {
 }
 
 function isEmpty(str) {
-	return !str || (undefined === str) || ("" === str);
+  return !str || (undefined === str) || ("" === str);
 }
 
 function defaultLog(msg) {
