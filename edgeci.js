@@ -1,7 +1,7 @@
 #! /usr/bin/env node
 
 var fs = require('fs');
-var unzip = require('unzip');
+var unzip = require('unzip-stream');
 var rimraf = require('rimraf');
 var chokidar = require('chokidar');
 var zipfolder = require('zip-folder');
