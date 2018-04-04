@@ -38,9 +38,36 @@ function parseArgs() {
   addGetKvmArgs(getKvmCommand);
   var insertKvmEntryCommand = subparsers.addParser('insertKvm', { addHelp: true, help: "insert kvm entry in a map in a environment" });
   addInsertKvmEntryArgs(insertKvmEntryCommand);
+  
+  var pullSharedFlowCommand = subparsers.addParser('pullSharedFlow', { addHelp: true, help: "pull shared flow from an org" });
+  addPullSharedFlowArgs(pullSharedFlowCommand);
+  
   args = parser.parseArgs();
   args.username = process.env.EDGE_USERNAME;
   args.password = process.env.EDGE_PASSWORD;
+}
+
+function addPullSharedFlowArgs(pullSharedFlowCommand) {
+  pullSharedFlowCommand.addArgument(
+    [ '-o', '--org' ],
+    { action: 'store', required: true, help: 'name of Edge org to pull sharedflow from' }
+  );
+  pullSharedFlowCommand.addArgument(
+    [ '-sf', '--sharedflow' ],
+    { action: 'store', required: true, nargs: '*', help: 'sharedflow to pull, space separated names or "all"' }
+  );
+  pullSharedFlowCommand.addArgument(
+    [ '-d', '--destination' ],
+    { action: 'store', defaultValue: ".", help: 'destination dir to download proxy files' }
+  );
+  pullSharedFlowCommand.addArgument(
+    [ '-c', '--continuous' ],
+    { action: 'storeTrue', help: 'continuously check for updates' }
+  );
+  pullSharedFlowCommand.addArgument(
+    [ '-i', '--interval' ],
+    { action: 'store', type: 'int', defaultValue: 30, help: 'interval to check for updates in seconds' }
+  );
 }
 
 function addInsertKvmEntryArgs(insertKvmEntryCommand) {
@@ -187,10 +214,18 @@ function runCommand() {
     getKvm();
   } else if (args.command === "insertKvm") {
     insertKvm();
+  } else if (args.command === "pullSharedFlow") {
+    if (args.continuous) {
+      setInterval(pullSharedFlow, (args.interval * 1000));
+    } else {
+      pullSharedFlow();
+    }
   } else {
     console.log("Unknown command " + args.command);
   }
 }
+
+
 
 function getKvm() {
 
@@ -201,6 +236,26 @@ function getKvm() {
 function insertKvm() {
     defaultLog("insertKvm: " + args.value);
     insertKvmEntry(args.org, args.env, args.map, args.key, args.value);
+}
+
+function pullSharedFlowWithArgs(username, password, org, sharedflows, destination, continuous, interval) {
+  args = {};
+  args.org = org;
+  args.sharedflow = sharedflows;
+  args.destination = destination;
+  args.continuous = continuous;
+  args.interval = interval;
+  args.username = username;
+  args.password = password;
+  pullSharedFlow();
+}
+
+function pullSharedFlow() {
+  if (args.sharedflow[0] === "all") {
+    getSharedFlowList(args.org, pullSharedFlows);
+  } else {
+    pullSharedFlows();
+  }
 }
 
 function pullWithArgs(username, password, org, proxies, destination, continuous, interval) {
@@ -280,6 +335,13 @@ function pullProxies() {
   });
 }
 
+function pullSharedFlows() {
+  args.sharedflow.forEach(function(aSharedflow) {
+    verboseLog("Checking sharedFlow: " + aSharedflow);
+    getSharedFlowToPull(args.org, aSharedflow, exportSharedFlow);
+  });
+}
+
 function pushProxies() {
   args.proxy.forEach(function(aProxy) {
     verboseLog("Checking proxy: " + aProxy);
@@ -352,6 +414,26 @@ function getProxyToPull(orgName, proxyName, callback) {
   });
 }
 
+function getSharedFlowToPull(orgName, sharedFlowName, callback) {
+  request(sharedFlowOptions(orgName, sharedFlowName), function(error, response, body) {
+    if (!error && response.statusCode == 200) {
+      var content = JSON.parse(body);
+      var lastRevision = getMaxRevision(content.revision);
+      var lastModified = content.metaData.lastModifiedAt;
+      if (!data[sharedFlowName] || (data[sharedFlowName].lastModified < lastModified)) {
+        data[sharedFlowName] = {
+          sharedFlowName: sharedFlowName,
+          lastRevision: lastRevision,
+          lastModified: lastModified
+        }
+        callback(orgName, sharedFlowName, lastRevision);
+      }
+    } else {
+      logError('getSharedFlowToPull: ', error, response, body);
+    }
+  });
+}
+
 function getProxyToPush(orgName, proxyName) {
   request(apiOptions(orgName, proxyName), function(error, response, body) {
     if (!error && response.statusCode == 200) {
@@ -382,6 +464,21 @@ function getProxyList(orgName, callback) {
   });
 }
 
+function getSharedFlowList(orgName, callback) {
+  defaultLog("Getting list of SharedFlows");
+  request(listSharedFlowOptions(orgName), function(error, response, body) {
+    if (!error && response.statusCode == 200) {
+      var sharedflows = JSON.parse(body);
+      defaultLog("SharedFlows: " + sharedflows);
+      args.sharedflow = sharedflows;
+      callback();
+    } else {
+      logError('listSharedFlows: ', error, response, body);
+    }
+  });
+}
+
+
 function exportKvm() {
   
 }
@@ -397,6 +494,19 @@ function exportProxy(orgName, proxyName, revision) {
     }
   })
   .pipe(unzip.Extract({ path: getProxyDestinationPath(proxyName) }));
+}
+
+function exportSharedFlow(orgName, sharedFlowName, revision) {
+  defaultLog("Exporting sharedFlow " + sharedFlowName + " revision " + revision);
+  rimraf.sync(getSharedFlowDestinationPath(sharedFlowName));
+  request(exportSharedFlowOptions(orgName, sharedFlowName, revision), function(error, response, body) {
+    if (!error && response.statusCode == 200) {
+      defaultLog("Done exporting sharedFlow " + sharedFlowName + " revision " + revision);
+    } else {
+      logError('exportSharedFlow: ', error, response, body);
+    }
+  })
+  .pipe(unzip.Extract({ path: getSharedFlowDestinationPath(sharedFlowName) }));
 }
 
 function zipProxy(proxyName) {
@@ -495,6 +605,17 @@ function listOptions(orgName) {
   };
 }
 
+function listSharedFlowOptions(orgName) {
+  return {
+    url: baseURL +  orgName + "/sharedflows",
+    method: 'GET',
+    auth: {
+      user: args.username,
+      pass: args.password
+    }
+  };
+}
+
 function apiOptions(orgName, proxyName) {
   return {
     url: baseURL +  orgName + "/apis/" + proxyName,
@@ -506,9 +627,34 @@ function apiOptions(orgName, proxyName) {
   };
 }
 
+function sharedFlowOptions(orgName, sharedFlowName) {
+  return {
+    url: baseURL +  orgName + "/sharedflows/" + sharedFlowName,
+    method: 'GET',
+    auth: {
+      user: args.username,
+      pass: args.password
+    }
+  };
+}
+
 function exportOptions(orgName, proxyName, revision) {
   return {
     url: baseURL +  orgName + "/apis/" + proxyName + "/revisions/" + revision,
+    method: 'GET',
+    auth: {
+      user: args.username,
+      pass: args.password
+    },
+    qs: {
+      format: "bundle"
+    }
+  };
+}
+
+function exportSharedFlowOptions(orgName, sharedFlowName, revision) {
+  return {
+    url: baseURL +  orgName + "/sharedflows/" + sharedFlowName + "/revisions/" + revision,
     method: 'GET',
     auth: {
       user: args.username,
@@ -577,6 +723,11 @@ function getProxyDestinationPath(proxyName) {
   return args.destination + "/" + proxyName;
 }
 
+function getSharedFlowDestinationPath(sharedFlowName) {
+  return args.destination + "/" + sharedFlowName;
+}
+
+
 function getProxySourcePath(proxyName) {
   return args.source + "/" + proxyName;
 }
@@ -614,6 +765,7 @@ if (require.main === module) {
 } else {
   module.exports = {
     pull: pullWithArgs,
-    push: pushWithArgs
+    push: pushWithArgs,
+	pullSharedFlow: pullSharedFlowWithArgs
   };
 }
