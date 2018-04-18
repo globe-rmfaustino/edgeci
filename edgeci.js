@@ -34,13 +34,17 @@ function parseArgs() {
   addPushArgs(pushCommand);
   var testCommand = subparsers.addParser('test', { addHelp: true, help: "run tests when a proxy is changed/deployed" });
   addTestArgs(testCommand);
-  var getKvmCommand = subparsers.addParser('getKvm', { addHelp: true, help: "get kvm from environment" });
+  var getKvmCommand = subparsers.addParser('getKvm', { addHelp: true, help: "get kvm entry from environment" });
   addGetKvmArgs(getKvmCommand);
+  var getKvmMapCommand = subparsers.addParser('getKvmMap', { addHelp: true, help: "get kvm map from environment" });
+  addGetKvmMapArgs(getKvmMapCommand);  
   var insertKvmEntryCommand = subparsers.addParser('insertKvm', { addHelp: true, help: "insert kvm entry in a map in a environment" });
   addInsertKvmEntryArgs(insertKvmEntryCommand);
   
   var pullSharedFlowCommand = subparsers.addParser('pullSharedFlow', { addHelp: true, help: "pull shared flow from an org" });
   addPullSharedFlowArgs(pullSharedFlowCommand);
+  
+  
   
   args = parser.parseArgs();
   args.username = process.env.EDGE_USERNAME;
@@ -102,23 +106,41 @@ function addInsertKvmEntryArgs(insertKvmEntryCommand) {
 function addGetKvmArgs(getKvmCommand) {
   getKvmCommand.addArgument(
     [ '-o', '--org' ],
-    { action: 'store', required: true, help: 'name of Edge org to get kvm from' }
+    { action: 'store', required: true, help: 'name of Edge org to get kvm entry from' }
   );
 
   getKvmCommand.addArgument(
     [ '-e', '--env' ],
-    { action: 'store', required: true, help: 'name of Edge env to get kvm from' }
+    { action: 'store', required: true, help: 'name of Edge env to get kvm entry from' }
   );
 
   getKvmCommand.addArgument(
     [ '-m', '--map' ],
-    { action: 'store', required: true, help: 'map name of kvm to get' }
+    { action: 'store', required: true, help: 'map name of kvm entry to get' }
   );
 
   getKvmCommand.addArgument(
     [ '-k', '--key' ],
-    { action: 'store', required: true, help: 'entry/key name of kvm to get' }
+    { action: 'store', required: true, help: 'entry/key name of kvm entry to get' }
   );
+
+}
+
+function addGetKvmMapArgs(getKvmMapCommand) {
+  getKvmMapCommand.addArgument(
+    [ '-o', '--org' ],
+    { action: 'store', required: true, help: 'name of Edge org to get kvm map from' }
+  );
+
+  getKvmMapCommand.addArgument(
+    [ '-e', '--env' ],
+    { action: 'store', required: true, help: 'name of Edge env to get kvm map from' }
+  );
+
+  getKvmMapCommand.addArgument(
+    [ '-m', '--map' ],
+    { action: 'store', required: true, help: 'map name of kvm map to get' }
+  );  
 
 }
 
@@ -212,6 +234,8 @@ function runCommand() {
     setInterval(test, (args.interval * 1000));
   } else if (args.command === "getKvm") {
     getKvm();
+  } else if (args.command === "getKvmMap") {
+    getKvmMap();
   } else if (args.command === "insertKvm") {
     insertKvm();
   } else if (args.command === "pullSharedFlow") {
@@ -225,7 +249,11 @@ function runCommand() {
   }
 }
 
+function getKvmMap() {
 
+  getKvmMapToPull(args.org, args.env, args.map);
+  
+}
 
 function getKvm() {
 
@@ -380,6 +408,17 @@ function getKvmToPull(orgName, environment, mapName, entryName) {
   });
 }
 
+function getKvmMapToPull(orgName, environment, mapName) {
+  request(getKvmMapOptions(orgName, environment, mapName), function(error, response, body) {
+    if (!error && response.statusCode == 200) {
+      var content = JSON.parse(body);
+      console.log(JSON.stringify(content));
+    } else {
+      logError('getKvmMapToPull: ', error, response, body);
+    }
+  });
+}
+
 function insertKvmEntry(orgName, environment, mapName, key, value) {
   defaultLog("Inserting key " + key + " value " + value + " to map " + mapName);
   request(insertKvmEntryOptions(orgName, environment, mapName, key, value), function(error, response, body) {
@@ -478,11 +517,6 @@ function getSharedFlowList(orgName, callback) {
   });
 }
 
-
-function exportKvm() {
-  
-}
-
 function exportProxy(orgName, proxyName, revision) {
   defaultLog("Exporting proxy " + proxyName + " revision " + revision);
   rimraf.sync(getProxyDestinationPath(proxyName));
@@ -568,6 +602,17 @@ function runTestCommand() {
 function getKvmOptions(orgName, environment, mapName, entryName) {
   return {
     url: baseURL +  orgName + "/environments/" + environment + "/keyvaluemaps/" + mapName + "/entries/" + entryName,
+    method: 'GET',
+    auth: {
+      user: args.username,
+      pass: args.password
+    }
+  };
+}
+
+function getKvmMapOptions(orgName, environment, mapName) {
+  return {
+    url: baseURL +  orgName + "/environments/" + environment + "/keyvaluemaps/" + mapName,
     method: 'GET',
     auth: {
       user: args.username,
